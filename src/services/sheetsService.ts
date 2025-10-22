@@ -10,7 +10,7 @@ export interface SalesData {
   marketplace: string;
 }
 
-const SHAREPOINT_URL = 'https://grupoaleimports.sharepoint.com/sites/Comercial/_layouts/15/download.aspx?SourceUrl=/sites/Comercial/Documentos%20Compartilhados/Comercial/Acompanhamento%20BI/CONTA%201%20-%20Analise%20BI%20-%20Curva%20ABC%20cpx.xlsx';
+const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sharepoint-proxy`;
 
 function parseMoneyValue(value: any): number {
   if (typeof value === 'number') return value;
@@ -34,10 +34,11 @@ function parseIntValue(value: any): number {
 
 export async function fetchSalesData(): Promise<SalesData[]> {
   try {
-    const response = await fetch(SHAREPOINT_URL, {
+    const response = await fetch(EDGE_FUNCTION_URL, {
       method: 'GET',
       headers: {
-        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
       },
     });
 
