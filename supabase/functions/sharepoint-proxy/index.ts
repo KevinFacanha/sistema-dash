@@ -6,7 +6,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const SHAREPOINT_URL = 'https://grupoaleimports.sharepoint.com/sites/Comercial/_layouts/15/download.aspx?SourceUrl=/sites/Comercial/Documentos%20Compartilhados/Comercial/Acompanhamento%20BI/CONTA%201%20-%20Analise%20BI%20-%20Curva%20ABC%20cpx.xlsx';
+const GOOGLE_SHEETS_ID = '1NIAAQFaqUImiPycs7Qf50rccwkuRfv54oUVo6N01WGo';
+const GOOGLE_SHEETS_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEETS_ID}/export?format=xlsx`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -17,9 +18,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log('📥 Buscando arquivo do SharePoint...');
-    
-    const response = await fetch(SHAREPOINT_URL, {
+    console.log('📥 Buscando arquivo do Google Sheets...');
+
+    const response = await fetch(GOOGLE_SHEETS_URL, {
       method: 'GET',
       headers: {
         'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -28,10 +29,10 @@ Deno.serve(async (req: Request) => {
     });
 
     if (!response.ok) {
-      console.error(`❌ Erro ao buscar do SharePoint: ${response.status} ${response.statusText}`);
+      console.error(`❌ Erro ao buscar do Google Sheets: ${response.status} ${response.statusText}`);
       return new Response(
-        JSON.stringify({ 
-          error: 'Erro ao buscar arquivo do SharePoint',
+        JSON.stringify({
+          error: 'Erro ao buscar arquivo do Google Sheets',
           status: response.status,
           statusText: response.statusText
         }),
@@ -59,7 +60,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('❌ Erro na Edge Function:', error);
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Erro ao processar requisição',
         message: error instanceof Error ? error.message : String(error)
       }),
