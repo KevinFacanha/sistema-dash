@@ -21,7 +21,9 @@ function App() {
     setLoading(true);
     try {
       const data = await fetchSalesData();
-      console.log('✅ Dashboard atualizado com sucesso!', `${data.length} registros carregados`);
+      if (import.meta.env.DEV) {
+        console.log(`✅ Dashboard atualizado: ${data.length} registros carregados`);
+      }
       setAllData(data);
       setFilteredData(data);
       setLastUpdate(new Date());
@@ -148,6 +150,8 @@ function App() {
   const handleReset = () => {
     setStartDate('');
     setEndDate('');
+    setSelectedDate(null);
+    setSelectedMarketplace(null);
   };
 
   const handleDateClick = (date: string) => {
@@ -194,7 +198,7 @@ function App() {
               </div>
               <div className="px-3 py-1 bg-blue-50 rounded-full border border-blue-200">
                 <span className="text-xs font-medium text-blue-700">
-                  {allData.length} registros
+                  {filteredData.length} de {allData.length} registros
                 </span>
               </div>
             </div>
