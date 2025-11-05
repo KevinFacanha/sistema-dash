@@ -7,7 +7,9 @@ const corsHeaders = {
 };
 
 const GOOGLE_SHEETS_ID = '1NIAAQFaqUImiPycs7Qf50rccwkuRfv54oUVo6N01WGo';
-const GOOGLE_SHEETS_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEETS_ID}/export?format=xlsx`;
+const GOOGLE_SHEETS_API_KEY = Deno.env.get('GOOGLE_SHEETS_API_KEY') || '';
+
+const GOOGLE_SHEETS_API_URL = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/Sheet1!A1:L1000?key=${GOOGLE_SHEETS_API_KEY}`;
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
@@ -18,23 +20,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    console.log('📥 Buscando arquivo do Google Sheets...');
+    console.log('📥 Buscando dados do Google Sheets API...');
 
-    const response = await fetch(GOOGLE_SHEETS_URL, {
+    const response = await fetch(GOOGLE_SHEETS_API_URL, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
     });
 
     if (!response.ok) {
       console.error(`❌ Erro ao buscar do Google Sheets: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Detalhes do erro:', errorText);
+
       return new Response(
         JSON.stringify({
-          error: 'Erro ao buscar arquivo do Google Sheets',
+          error: 'Erro ao buscar dados do Google Sheets',
           status: response.status,
-          statusText: response.statusText
+          statusText: response.statusText,
+          details: errorText
         }),
         {
           status: response.status,
@@ -46,15 +48,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    console.log(`✅ Arquivo baixado com sucesso: ${arrayBuffer.byteLength} bytes`);
+    const data = await response.json();
+    console.log(`✅ Dados obtidos com sucesso: ${data.values?.length || 0} linhas`);
 
-    return new Response(arrayBuffer, {
+    return new Response(JSON.stringify(data), {
       status: 200,
       headers: {
         ...corsHeaders,
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Length': arrayBuffer.byteLength.toString(),
+        'Content-Type': 'application/json',
       },
     });
   } catch (error) {

@@ -110,19 +110,11 @@ export async function fetchSalesData(): Promise<SalesData[]> {
     });
 
     if (!response.ok) {
-      throw new Error(`Erro ao buscar arquivo: ${response.status} ${response.statusText}`);
+      throw new Error(`Erro ao buscar dados: ${response.status} ${response.statusText}`);
     }
 
-    const arrayBuffer = await response.arrayBuffer();
-    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-
-    let sheetName = SHEET_TAB_NAME && workbook.SheetNames.includes(SHEET_TAB_NAME)
-      ? SHEET_TAB_NAME
-      : workbook.SheetNames[0];
-
-    const worksheet = workbook.Sheets[sheetName];
-
-    const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    const apiData = await response.json();
+    const rawData: any[] = apiData.values || [];
 
     if (rawData.length < 2) {
       console.warn('Planilha vazia ou sem dados');
@@ -146,6 +138,14 @@ export async function fetchSalesData(): Promise<SalesData[]> {
       variacaoConversao: findHeaderIndex(headerRow, EXPECTED_HEADERS[10]),
       marketplace: findHeaderIndex(headerRow, EXPECTED_HEADERS[11]),
     };
+
+    if (import.meta.env.DEV) {
+      console.log('Headers encontrados:', {
+        data: headerIndices.data,
+        faturamentoDia: headerIndices.faturamentoDia,
+        quantidadeVendas: headerIndices.quantidadeVendas,
+      });
+    }
 
     const isDev = import.meta.env.DEV;
 
