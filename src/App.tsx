@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { DollarSign, ShoppingBag, TrendingUp, Users, Percent, BarChart3, RefreshCw, X } from 'lucide-react';
-import { fetchSalesData, SalesData } from './services/sheetsService';
+import { fetchSalesData, syncSheetsData, SalesData } from './services/sheetsService';
 import { DateFilter } from './components/DateFilter';
 import { KPICard } from './components/KPICard';
 import { SalesChart } from './components/SalesChart';
@@ -20,6 +20,7 @@ function App() {
   const loadData = async () => {
     setLoading(true);
     try {
+      await syncSheetsData();
       const data = await fetchSalesData();
       if (import.meta.env.DEV) {
         console.log(`✅ Dashboard atualizado: ${data.length} registros carregados`);
@@ -36,7 +37,7 @@ function App() {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5 * 60 * 1000);
+    const interval = setInterval(loadData, 2 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
 

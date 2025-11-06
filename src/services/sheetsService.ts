@@ -1,5 +1,3 @@
-import * as XLSX from 'xlsx';
-
 export interface SalesData {
   data: string;
   __key?: string;
@@ -16,8 +14,8 @@ export interface SalesData {
   variacaoConversao?: number;
 }
 
-const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sharepoint-proxy`;
-const SHEET_TAB_NAME = '';
+const GET_SHEETS_DATA_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-sheets-data`;
+const SYNC_SHEETS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-sync`;
 
 const EXPECTED_HEADERS = [
   'Data',
@@ -99,12 +97,32 @@ function parseDate(value: any): { formatted: string; iso: string } | null {
   return { formatted, iso };
 }
 
-export async function fetchSalesData(): Promise<SalesData[]> {
+export async function syncSheetsData(): Promise<void> {
   try {
-    const response = await fetch(EDGE_FUNCTION_URL, {
+    const response = await fetch(SYNC_SHEETS_URL, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Erro ao sincronizar: ${response.status} ${response.statusText}`);
+    }
+
+    if (import.meta.env.DEV) {
+      console.log('✅ Dados sincronizados da planilha Google Sheets');
+    }
+  } catch (error) {
+    console.error('❌ Erro ao sincronizar Google Sheets:', error);
+  }
+}
+
+export async function fetchSalesData(): Promise<SalesData[]> {
+  try {
+    const response = await fetch(GET_SHEETS_DATA_URL, {
+      method: 'GET',
+      headers: {
         'Content-Type': 'application/json',
       },
     });
@@ -116,71 +134,42 @@ export async function fetchSalesData(): Promise<SalesData[]> {
     const apiData = await response.json();
     const rawData: any[] = apiData.values || [];
 
-    if (rawData.length < 2) {
-      console.warn('Planilha vazia ou sem dados');
+    if (rawData.length === 0) {
+      console.warn('Cache vazio ou sem dados');
       return [];
     }
 
-    const headerRow = rawData[0];
-    const dataRows = rawData.slice(1);
-
-    const headerIndices = {
-      data: findHeaderIndex(headerRow, EXPECTED_HEADERS[0]),
-      faturamentoDia: findHeaderIndex(headerRow, EXPECTED_HEADERS[1]),
-      variacaoFat: findHeaderIndex(headerRow, EXPECTED_HEADERS[2]),
-      quantidadeVendas: findHeaderIndex(headerRow, EXPECTED_HEADERS[3]),
-      variacaoVendas: findHeaderIndex(headerRow, EXPECTED_HEADERS[4]),
-      ticketMedio: findHeaderIndex(headerRow, EXPECTED_HEADERS[5]),
-      variacaoTicket: findHeaderIndex(headerRow, EXPECTED_HEADERS[6]),
-      numeroVisitas: findHeaderIndex(headerRow, EXPECTED_HEADERS[7]),
-      variacaoVisitas: findHeaderIndex(headerRow, EXPECTED_HEADERS[8]),
-      taxaConversao: findHeaderIndex(headerRow, EXPECTED_HEADERS[9]),
-      variacaoConversao: findHeaderIndex(headerRow, EXPECTED_HEADERS[10]),
-      marketplace: findHeaderIndex(headerRow, EXPECTED_HEADERS[11]),
-    };
-
-    if (import.meta.env.DEV) {
-      console.log('Headers encontrados:', {
-        data: headerIndices.data,
-        faturamentoDia: headerIndices.faturamentoDia,
-        quantidadeVendas: headerIndices.quantidadeVendas,
-      });
-    }
-
-    const isDev = import.meta.env.DEV;
-
-    const salesData: SalesData[] = dataRows
-      .map((row: any[]): SalesData | null => {
-        const dateResult = parseDate(row[headerIndices.data]);
+    const salesData: SalesData[] = rawData
+      .map((row: any): SalesData | null => {
+        const dateResult = parseDate(row.data);
         if (!dateResult) return null;
 
         const parsedData: SalesData = {
-          data: dateResult.formatted,
+          data: row.data,
           __key: dateResult.iso,
-          faturamentoDia: parseMoneyValue(row[headerIndices.faturamentoDia]),
-          quantidadeVendas: parseIntValue(row[headerIndices.quantidadeVendas]),
-          ticketMedio: parseMoneyValue(row[headerIndices.ticketMedio]),
-          numeroVisitas: parseIntValue(row[headerIndices.numeroVisitas]),
-          taxaConversao: parsePercentValue(row[headerIndices.taxaConversao]),
-          marketplace: String(row[headerIndices.marketplace] || '').trim(),
-          variacaoFat: parsePercentValue(row[headerIndices.variacaoFat]),
-          variacaoVendas: parsePercentValue(row[headerIndices.variacaoVendas]),
-          variacaoTicket: parsePercentValue(row[headerIndices.variacaoTicket]),
-          variacaoVisitas: parsePercentValue(row[headerIndices.variacaoVisitas]),
-          variacaoConversao: parsePercentValue(row[headerIndices.variacaoConversao]),
+          faturamentoDia: row.faturamentoDia || 0,
+          quantidadeVendas: row.quantidadeVendas || 0,
+          ticketMedio: row.ticketMedio || 0,
+          numeroVisitas: row.numeroVisitas || 0,
+          taxaConversao: row.taxaConversao || 0,
+          marketplace: row.marketplace || '',
+          variacaoFat: row.variacaoFat || 0,
+          variacaoVendas: row.variacaoVendas || 0,
+          variacaoTicket: row.variacaoTicket || 0,
+          variacaoVisitas: row.variacaoVisitas || 0,
+          variacaoConversao: row.variacaoConversao || 0,
         };
 
         return parsedData;
       })
       .filter((item: SalesData | null): item is SalesData => item !== null);
 
-    if (isDev) {
-      console.log(`📊 Dados carregados: ${salesData.length} registros`);
-      console.log('✅ Primeiras 2 linhas normalizadas:');
+    if (import.meta.env.DEV) {
+      console.log(`📊 Dados carregados do cache: ${salesData.length} registros`);
+      console.log('✅ Primeiras 2 linhas:');
       salesData.slice(0, 2).forEach((row, idx) => {
         console.log(`Linha ${idx + 1}:`, {
           data: row.data,
-          __key: row.__key,
           faturamentoDia: row.faturamentoDia,
           quantidadeVendas: row.quantidadeVendas,
           marketplace: row.marketplace,
@@ -190,7 +179,7 @@ export async function fetchSalesData(): Promise<SalesData[]> {
 
     return salesData;
   } catch (error) {
-    console.error('❌ Erro ao buscar dados do Google Sheets:', error);
+    console.error('❌ Erro ao buscar dados do cache:', error);
     return [];
   }
 }
